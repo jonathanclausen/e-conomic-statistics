@@ -1,10 +1,16 @@
 import api
+import reporter
 import sys
 import os
 import json
 import logging
 import datetime as dt
 
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from smtplib import SMTP_SSL as SMTP 
+from email.mime.application import MIMEApplication
+from os.path import basename
 
 TestMode = False
 DIR = os.path.dirname(os.path.realpath(__file__)) + "/"
@@ -49,30 +55,117 @@ def run(current_date):
     ec_api = api.Api(config, createLogger("Api"))
     customers = ec_api.getAllCustomers()
 
-    # with open(DIR + "/data/customers.json", "w") as outfile:
-    #     json.dump(customers, outfile)
+    diff = []
 
     with open(DIR + "/data/customers.json", 'r') as customerFile:
         previousCustomers = json.load(customerFile)
 
-        diff = []
+        
         
         for cust in customers:
             if not any(x['customerNumber'] == cust['customerNumber'] for x in previousCustomers):
-                print("hello");
+                
                 diff.append(cust)
         Logger.debug(f"Found {len(diff)} customer not already in json file")
 
+    with open(DIR + "/data/customers.json", "w") as outfile:
+        json.dump(customers, outfile)
 
     # Handle the differences and save the the new file.
+    
+    employees = ec_api.getEmployees()
+
+
+
+    for customer in diff:
+        responsible_employee_id = customer['customerGroup']['customerGroupNumber']
+        responsible_employee = next((x for x in employees if x['employeeNumber'] == responsible_employee_id), None)
         
+        if (not responsible_employee): Logger.Error(f"Could not find employee with id {responsible_employee_id}")
+
+        customer['employeeName'] = responsible_employee['name']
+        customer['employeeEmail'] = responsible_employee['email']
+
+    employee_acquisitions = {emp['name']: [] for emp in employees }
+    employee_emails = {emp['name']: emp['email'] for emp in employees }
+
+    for customer in diff:
+        
+        if customer['employeeName'] in employee_acquisitions:
+            employee_acquisitions[customer['employeeName']].append(customer)
+        else: 
+            Logger.error(f"Could not find employee {customer}")
+
+    rep = reporter.Reporter(config, createLogger("Reporter"))
+
+    for name,customers in employee_acquisitions.items():
+        html = rep.build_html(customers,name, current_date)
+        
+        
+        # Send html as email
+        mail_result(employee_emails[name], html)
+
+    # Creating totals email
+    
+    totals_list = []
+    counts = {}
+    for name,customers in employee_acquisitions.items():
+        totals_list.extend(customers)
+        counts[name] = len(customers)
+
+    totals_list.sort(key=lambda x: x['employeeName'])
+    totals_html = rep.build_html(totals_list, "All", current_date, counts)
+    f = open("demo.html", "w")
+    f.write(totals_html)
+    f.close()
+
+    # Save new file with date in title, so we save history
+    # with open(DIR + "/data/customers.json", "w") as outfile:
+    #     json.dump(customers, outfile)
 
 
-if( len(sys.argv) > 1 and sys.argv[1] == "test"):
+def mail_result(recipient, body):
+
+    if TestMode: recipient = "wordpress@concensur.dk"
+
+    SMTPserver = 'smtp.simply.com'
+    sender =     'Customer Report <reports@concensur.dk>'
+    destination = recipient
+
+    USERNAME = config['smtp_username']
+    PASSWORD = config['smtp_password']
+    
+
+    subject="Customer Report"
+
+    try:
+        msg = MIMEMultipart()
+        msg['Subject']= subject
+        msg['From']   = sender # some SMTP servers will do this automatically, not all
+        msg.add_header('reply-to', "wordpress@concensur.dk")
+
+        msg.attach(MIMEText(body, 'html'))
+
+        conn = SMTP(SMTPserver)
+        conn.set_debuglevel(False)
+        conn.login(USERNAME, PASSWORD)
+        
+        try:
+            conn.sendmail(sender, destination, msg.as_string())
+        finally:
+            conn.quit()
+
+    except Exception as e:
+        sys.exit( "mail failed; %s" % e ) # give an error message
+
+
+
+
+if( len(sys.argv) > 1 and sys.argv[1] == "live"):
+    print("Running in mode 'Live' ")
+    run(dt.datetime.now)
+
+else:
     print("Running in mode 'Test' ")
     TestMode = True
-else:
-    print("Running in mode 'Live'")
-
-
-run(dt.datetime(2022,10,1))
+    run(dt.datetime(2022,10,1))

@@ -32,4 +32,24 @@ class Api:
         
         self.logger.info(f'Found {len(customers)} customers')
         return customers
+    
+    def getEmployees(self):
+        self.logger.info("GetEmployees")
+        employees = []
+        
+        url = self.base_url + 'employees?pageSize=100'
+
+        result = self.session.get(url).json()
+        employees.extend(result['collection'])
+
+        while ('nextPage' in result['pagination']):
+            next_page = result['pagination']['nextPage']
+            result = self.session.get(next_page).json()
+
+            employees.extend(result['collection'])
+            
+            
+        
+        self.logger.info(f'Found {len(employees)} employees')
+        return employees
         
