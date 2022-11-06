@@ -141,7 +141,7 @@ def mail_result(recipient, body):
 
 if( len(sys.argv) > 1 and sys.argv[1] == "live"):
     print("Running in mode 'Live' ")
-    run(dt.datetime.now)
+    run(dt.datetime.now())
 
 else:
     print("Running in mode 'Test' ")
