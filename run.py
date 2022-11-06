@@ -5,7 +5,6 @@ import os
 import json
 import logging
 import datetime as dt
-
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from smtplib import SMTP_SSL as SMTP 
@@ -14,7 +13,6 @@ from os.path import basename
 
 TestMode = False
 DIR = os.path.dirname(os.path.realpath(__file__)) + "/"
-
 
 def createLogger(name):
     log_dir = DIR + 'logs'
@@ -30,53 +28,45 @@ def createLogger(name):
 
     return logger
 
-
 Logger = createLogger("Run")
-
 
 f = open(DIR + 'config.json')
 config = json.load(f)
 f.close()
-
 Logger.debug("Got configuration")
-
-
-
 
 def run(current_date):
 
-    if(current_date.day != 1):
-        Logger.error(f'Can only run script on first of month. Current date is {current_date}')
+    if(current_date.day != config['day_of_month_to_run']):
+        Logger.error(f'Can only run script on day first of month. Current date is {current_date}')
         print("Script is only run on first day of month")
         exit()
 
-
-
     ec_api = api.Api(config, createLogger("Api"))
     customers = ec_api.getAllCustomers()
-
     diff = []
 
     with open(DIR + "/data/customers.json", 'r') as customerFile:
+        # Save old file to new file with date attached
         previousCustomers = json.load(customerFile)
 
+        with open(DIR + "/data/customers" + str(current_date.strftime("%d-%m-%Y%H:%M:%S")) + ".json", "w") as outfile:
+            json.dump(previousCustomers, outfile)
         
-        
+        # Find differences in old and new files
         for cust in customers:
             if not any(x['customerNumber'] == cust['customerNumber'] for x in previousCustomers):
                 
                 diff.append(cust)
         Logger.debug(f"Found {len(diff)} customer not already in json file")
 
+    # Write new with differences to customers.json
     with open(DIR + "/data/customers.json", "w") as outfile:
         json.dump(customers, outfile)
-
-    # Handle the differences and save the the new file.
     
     employees = ec_api.getEmployees()
 
-
-
+    # attach employees to customers
     for customer in diff:
         responsible_employee_id = customer['customerGroup']['customerGroupNumber']
         responsible_employee = next((x for x in employees if x['employeeNumber'] == responsible_employee_id), None)
@@ -98,15 +88,13 @@ def run(current_date):
 
     rep = reporter.Reporter(config, createLogger("Reporter"))
 
+    # Create individual emails for customers
     for name,customers in employee_acquisitions.items():
         html = rep.build_html(customers,name, current_date)
-        
-        
         # Send html as email
         mail_result(employee_emails[name], html)
 
     # Creating totals email
-    
     totals_list = []
     counts = {}
     for name,customers in employee_acquisitions.items():
@@ -115,17 +103,11 @@ def run(current_date):
 
     totals_list.sort(key=lambda x: x['employeeName'])
     totals_html = rep.build_html(totals_list, "All", current_date, counts)
-    f = open("demo.html", "w")
-    f.write(totals_html)
-    f.close()
-
-    # Save new file with date in title, so we save history
-    # with open(DIR + "/data/customers.json", "w") as outfile:
-    #     json.dump(customers, outfile)
+    mail_result("wordpress@concensur.dk", totals_html)
+    mail_result("ff@auto-mow.com", totals_html)
 
 
 def mail_result(recipient, body):
-
     if TestMode: recipient = "wordpress@concensur.dk"
 
     SMTPserver = 'smtp.simply.com'
@@ -135,7 +117,6 @@ def mail_result(recipient, body):
     USERNAME = config['smtp_username']
     PASSWORD = config['smtp_password']
     
-
     subject="Customer Report"
 
     try:
@@ -143,7 +124,6 @@ def mail_result(recipient, body):
         msg['Subject']= subject
         msg['From']   = sender # some SMTP servers will do this automatically, not all
         msg.add_header('reply-to', "wordpress@concensur.dk")
-
         msg.attach(MIMEText(body, 'html'))
 
         conn = SMTP(SMTPserver)
@@ -159,8 +139,6 @@ def mail_result(recipient, body):
         sys.exit( "mail failed; %s" % e ) # give an error message
 
 
-
-
 if( len(sys.argv) > 1 and sys.argv[1] == "live"):
     print("Running in mode 'Live' ")
     run(dt.datetime.now)
@@ -168,4 +146,4 @@ if( len(sys.argv) > 1 and sys.argv[1] == "live"):
 else:
     print("Running in mode 'Test' ")
     TestMode = True
-    run(dt.datetime(2022,10,1))
+    run(dt.datetime(2022,10,1,13,22,10))

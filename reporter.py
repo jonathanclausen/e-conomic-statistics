@@ -72,7 +72,6 @@ class Reporter:
                 <tr>
                 <th scope="col">Number</th>
                 <th scope="col">Name</th>
-                <th scope="col">Currency</th>
                 <th scope="col">Employee</th>
                 </tr>
             </thead>
@@ -82,7 +81,6 @@ class Reporter:
             <tr>
                 <td>""" + str(customer['customerNumber']) + """</td>
                 <td>""" + customer['name'] + """</td>
-                <td>""" + customer['currency'] + """</td>
                 <td>""" + customer['employeeName'] + """</td>
             </tr>"""
         html += """
