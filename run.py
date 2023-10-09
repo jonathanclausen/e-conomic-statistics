@@ -64,7 +64,22 @@ def run(current_date):
     with open(DIR + "/data/customers.json", "w") as outfile:
         json.dump(customers, outfile)
     
-    employees = ec_api.getEmployees()
+    # Get employee email addresses
+    temp_employees = ec_api.getEmployees()
+    employees = []
+    # Sanitize phone numbers
+    for emp in temp_employees:
+        if 'phone' in emp and 'email' in emp:
+            emp['phone'] = emp['phone'].replace(" ", "").replace("+45", "")
+            emp['email'] = emp['email'].lower()
+            employees.append(emp)
+        else:
+            if 'email' in emp:
+                Logger.info(f"No phone number for employee: {emp['email']}")
+            elif 'name' in emp:
+                Logger.info(f"No phone number or email for employee: {emp['name']}")
+            else:
+                Logger.info(f"No phone number, email or name found for employee")
 
     # attach employees to customers
     for customer in diff:
