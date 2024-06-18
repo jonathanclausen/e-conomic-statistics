@@ -86,7 +86,8 @@ def run(current_date):
         responsible_employee_id = customer['customerGroup']['customerGroupNumber']
         responsible_employee = next((x for x in employees if x['employeeNumber'] == responsible_employee_id), None)
         
-        if (not responsible_employee): Logger.Error(f"Could not find employee with id {responsible_employee_id}")
+        if (not responsible_employee): 
+            Logger.error(f"Could not find employee with id {responsible_employee_id}")
 
         customer['employeeName'] = responsible_employee['name']
         customer['employeeEmail'] = responsible_employee['email']
@@ -118,8 +119,8 @@ def run(current_date):
 
     totals_list.sort(key=lambda x: x['employeeName'])
     totals_html = rep.build_html(totals_list, "All", current_date, counts)
-    mail_result("wordpress@concensur.dk", totals_html)
-    mail_result("ff@auto-mow.com", totals_html)
+    #mail_result("wordpress@concensur.dk", totals_html)
+    #mail_result("ff@auto-mow.com", totals_html)
 
 
 def mail_result(recipient, body):
