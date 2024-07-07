@@ -65,15 +65,21 @@ def run(current_date):
         json.dump(customers, outfile)
     
     # Get employee email addresses
-    temp_employees = ec_api.getEmployees()
-    employees = []
+    employees = ec_api.getEmployees()
     # Sanitize phone numbers
-    for emp in temp_employees:
+
+    employee_acquisitions = {}
+    employee_emails = {}
+
+    for emp in employees:
         if 'phone' in emp and 'email' in emp:
             emp['phone'] = emp['phone'].replace(" ", "").replace("+45", "")
             emp['email'] = emp['email'].lower()
-            employees.append(emp)
+            emp['isActive'] = True
+            employee_emails[emp['name']] = emp['email']
+            employee_acquisitions[emp['name']] = []
         else:
+            emp['isActive'] = False
             if 'email' in emp:
                 Logger.info(f"No phone number for employee: {emp['email']}")
             elif 'name' in emp:
@@ -81,26 +87,23 @@ def run(current_date):
             else:
                 Logger.info(f"No phone number, email or name found for employee")
 
+
     # attach employees to customers
     for customer in diff:
         responsible_employee_id = customer['customerGroup']['customerGroupNumber']
         responsible_employee = next((x for x in employees if x['employeeNumber'] == responsible_employee_id), None)
         
         if (not responsible_employee): 
-            Logger.error(f"Could not find employee with id {responsible_employee_id}")
-
+            Logger.error(f"No employee found with id: {responsible_employee_id}")
+            continue
+        if (not responsible_employee['isActive']):
+            Logger.info(f"Found customer for non-active employee with id: {responsible_employee_id}. Set email and phone number in e-conomics to activate employee for report.")
+            continue
+        
         customer['employeeName'] = responsible_employee['name']
-        customer['employeeEmail'] = responsible_employee['email']
-
-    employee_acquisitions = {emp['name']: [] for emp in employees }
-    employee_emails = {emp['name']: emp['email'] for emp in employees }
-
-    for customer in diff:
         
         if customer['employeeName'] in employee_acquisitions:
             employee_acquisitions[customer['employeeName']].append(customer)
-        else: 
-            Logger.error(f"Could not find employee {customer}")
 
     rep = reporter.Reporter(config, createLogger("Reporter"))
 
@@ -119,8 +122,7 @@ def run(current_date):
 
     totals_list.sort(key=lambda x: x['employeeName'])
     totals_html = rep.build_html(totals_list, "All", current_date, counts)
-    #mail_result("wordpress@concensur.dk", totals_html)
-    #mail_result("ff@auto-mow.com", totals_html)
+    mail_result("ff@auto-mow.com", totals_html)
 
 
 def mail_result(recipient, body):
@@ -162,4 +164,4 @@ if( len(sys.argv) > 1 and sys.argv[1] == "live"):
 else:
     print("Running in mode 'Test' ")
     TestMode = True
-    run(dt.datetime(2022,10,1,13,22,10))
+    run(dt.datetime(2024,1,1,13,22,10))

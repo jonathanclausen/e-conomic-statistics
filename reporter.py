@@ -8,6 +8,11 @@ class Reporter:
 
     def build_html(self, customers, user, date, counts = {}):
         self.logger.info(f"building report for {user}")
+        # Determine the first day of the current month
+        first_day_of_current_month = date.replace(day=1)
+
+        # Calculate the last day of the previous month
+        last_day_of_previous_month = first_day_of_current_month - dt.timedelta(days=1)
         html = """
         <!doctype html><html lang="en">
         <head>
@@ -36,12 +41,12 @@ class Reporter:
         </head>
         <body>
             <div class="container">
-                <h1>Customers registered in """+ date.strftime("%B %Y") + """</h1>
+                <h1>Customers registered in """+ last_day_of_previous_month.strftime("%B %Y") + """</h1>
                 
                 <p>Report for """ + user + """</p>
                 <small>Report generated at: """ + str(date.strftime("%d-%m-%Y %H:%M:%S")) + """ </small>
                 <br>
-                <p>Total new customers in """ +date.strftime("%B %Y") + """: """+ str(len(customers))+"""</p>
+                <p>Total new customers in """ +last_day_of_previous_month.strftime("%B %Y") + """: """+ str(len(customers))+"""</p>
 
         """
 
