@@ -124,26 +124,27 @@ def run(current_date):
 
     totals_list.sort(key=lambda x: x['employeeName'])
     totals_html = rep.build_html(totals_list, "All", current_date, counts)
-    mail_result("ff@auto-mow.com", totals_html)
+    for email in config['admins']:
+        mail_result(email, totals_html)
 
-USERNAME = config['smtp_username']
-PASSWORD = config['smtp_password']
-SMTPserver = 'smtp.simply.com'
+USERNAME = config['smtp']['username']
+PASSWORD = config['smtp']['password']
+SMTPserver = config['smtp']['server']
 conn = SMTP(SMTPserver)
 conn.set_debuglevel(False)
 conn.login(USERNAME, PASSWORD)
 
 def mail_result(recipient, body):
-    if TestMode: recipient = "wordpress@concensur.dk"
+    if TestMode: recipient = config['smtp']['test_mode_receiver'] 
 
-    sender = 'Customer Report <reports@concensur.dk>'
+    sender = 'Customer Report <' + config['smtp']['sent_from'] + ">"
     destination = recipient
     subject="Customer Report"
     try:
         msg = MIMEMultipart()
         msg['Subject']= subject
         msg['From']   = sender # some SMTP servers will do this automatically, not all
-        msg.add_header('reply-to', "wordpress@concensur.dk")
+        msg.add_header('reply-to', config['smtp']['reply_to'])
         msg.attach(MIMEText(body, 'html'))
         conn.sendmail(sender, destination, msg.as_string())
     except Exception as e:
