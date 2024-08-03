@@ -12,16 +12,17 @@ from email.mime.application import MIMEApplication
 from os.path import basename
 
 TestMode = False
-DIR = os.path.dirname(os.path.realpath(__file__)) + "/"
+DIR = os.path.dirname(os.path.realpath(__file__))
 
 def createLogger(name):
-    log_dir = DIR + 'logs'
+    log_dir = os.path.join(DIR,"logs")
+
     if not os.path.exists(log_dir):
        os.makedirs(log_dir)
 
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
-    file_handler = logging.FileHandler(log_dir + '/e-conomic-statistics.log')
+    file_handler = logging.FileHandler(os.path.join(log_dir,"e-conomic-statistics.log"))
     file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     file_handler.setLevel(logging.DEBUG)
     logger.addHandler(file_handler)
@@ -30,7 +31,7 @@ def createLogger(name):
 
 Logger = createLogger("Run")
 
-f = open(DIR + 'config.json')
+f = open(os.path.join(DIR, 'config.json'))
 config = json.load(f)
 f.close()
 Logger.debug("Got configuration")
@@ -46,11 +47,12 @@ def run(current_date):
     customers = ec_api.getAllCustomers()
     diff = []
 
-    with open(DIR + "/data/customers.json", 'r') as customerFile:
+
+    with open(os.path.join(DIR,"data","customers.json"), 'r') as customerFile:
         # Save old file to new file with date attached
         previousCustomers = json.load(customerFile)
 
-        with open(DIR + "/data/customers" + str(current_date.strftime("%d-%m-%Y%H:%M:%S")) + ".json", "w") as outfile:
+        with open(os.path.join(DIR, "data", "customers" + str(current_date.strftime("%d%m%Y%H%M%S")) + ".json"), "w") as outfile:
             json.dump(previousCustomers, outfile)
         
         # Find differences in old and new files
@@ -61,7 +63,7 @@ def run(current_date):
         Logger.debug(f"Found {len(diff)} customer not already in json file")
 
     # Write new with differences to customers.json
-    with open(DIR + "/data/customers.json", "w") as outfile:
+    with open(os.path.join(DIR,"data","customers.json"), "w") as outfile:
         json.dump(customers, outfile)
     
     # Get employee email addresses
@@ -124,38 +126,28 @@ def run(current_date):
     totals_html = rep.build_html(totals_list, "All", current_date, counts)
     mail_result("ff@auto-mow.com", totals_html)
 
+USERNAME = config['smtp_username']
+PASSWORD = config['smtp_password']
+SMTPserver = 'smtp.simply.com'
+conn = SMTP(SMTPserver)
+conn.set_debuglevel(False)
+conn.login(USERNAME, PASSWORD)
 
 def mail_result(recipient, body):
     if TestMode: recipient = "wordpress@concensur.dk"
 
-    SMTPserver = 'smtp.simply.com'
-    sender =     'Customer Report <reports@concensur.dk>'
+    sender = 'Customer Report <reports@concensur.dk>'
     destination = recipient
-
-    USERNAME = config['smtp_username']
-    PASSWORD = config['smtp_password']
-    
     subject="Customer Report"
-
     try:
         msg = MIMEMultipart()
         msg['Subject']= subject
         msg['From']   = sender # some SMTP servers will do this automatically, not all
         msg.add_header('reply-to', "wordpress@concensur.dk")
         msg.attach(MIMEText(body, 'html'))
-
-        conn = SMTP(SMTPserver)
-        conn.set_debuglevel(False)
-        conn.login(USERNAME, PASSWORD)
-        
-        try:
-            conn.sendmail(sender, destination, msg.as_string())
-        finally:
-            conn.quit()
-
+        conn.sendmail(sender, destination, msg.as_string())
     except Exception as e:
         sys.exit( "mail failed; %s" % e ) # give an error message
-
 
 if( len(sys.argv) > 1 and sys.argv[1] == "live"):
     print("Running in mode 'Live' ")
